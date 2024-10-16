@@ -16,6 +16,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.example.appio_test_2.R
 import com.example.appio_test_2.databinding.MapFragmentBinding
+import com.example.appio_test_2.utils.showDialog
 import com.example.appio_test_2.utils.subscribe
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.RequestPoint
@@ -91,43 +92,34 @@ class MapFragment : Fragment() {
     }
 
     private fun showDialogHandlerToSettings() {
-        val builder = AlertDialog.Builder(requireContext())
-        builder.setTitle(getString(R.string.fragment_map_on_geo))
-        builder.setMessage(getString(R.string.fragment_map_geo_text))
-
-        builder.setPositiveButton(getString(R.string.fragment_map_geo_settings)) { _, _ ->
-            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-            startActivity(intent)
-        }
-
-        builder.setNegativeButton(getString(R.string.fragment_map_geo_cancel)) { dialog, _ ->
-            dialog.dismiss()
-        }
-
-        builder.create().show()
+        showDialog(
+            title = getString(R.string.fragment_map_on_geo),
+            message = getString(R.string.fragment_map_geo_text),
+            positiveButtonText = getString(R.string.fragment_map_geo_settings),
+            negativeButtonText = getString(R.string.fragment_map_geo_cancel),
+            onPositiveClick = {
+                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                startActivity(intent)
+            }
+        )
     }
 
     @SuppressLint("StringFormatMatches")
     private fun showDialogRoute(point: Point, namePoint: String) {
-        val dialogBuilder = AlertDialog.Builder(requireContext())
-        dialogBuilder.setTitle(
-            getString(
-                R.string.fragment_map_names, namePoint, point.latitude, point.longitude
-            )
+        showDialog(
+            title = getString(
+                R.string.fragment_map_names,
+                namePoint,
+                point.latitude,
+                point.longitude
+            ),
+            message = getString(R.string.fragment_map_question),
+            positiveButtonText = getString(R.string.fragment_map_yes),
+            negativeButtonText = getString(R.string.fragment_map_no),
+            onPositiveClick = {
+                viewModel.onEvent(MapView.Event.OnClickDrivingRoute(point))
+            }
         )
-        dialogBuilder.setMessage(getString(R.string.fragment_map_question))
-
-        dialogBuilder.setPositiveButton(getString(R.string.fragment_map_yes)) { _, _ ->
-            viewModel.onEvent(MapView.Event.OnClickDrivingRoute(point))
-        }
-
-        dialogBuilder.setNegativeButton(getString(R.string.fragment_map_no)) { dialog, _ ->
-            dialog.dismiss()
-        }
-        dialogBuilder.setNegativeButton(getString(R.string.fragment_map_delete_poits)) { _, _ ->
-            viewModel.onEvent(MapView.Event.OnClickDeletePoint(point))
-        }
-        dialogBuilder.create().show()
     }
 
     private fun showDialogCreateName(point: Point) {
@@ -138,7 +130,6 @@ class MapFragment : Fragment() {
         val dialogBuilder = AlertDialog.Builder(requireContext())
         dialogBuilder.setTitle(getString(R.string.fragment_map_name_point))
         dialogBuilder.setMessage(getString(R.string.fragment_map_question_nme))
-
         dialogBuilder.setView(editText)
 
         dialogBuilder.setNegativeButton(R.string.fragment_map_no) { dialog, _ ->
