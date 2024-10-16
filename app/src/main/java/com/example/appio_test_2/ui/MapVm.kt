@@ -1,0 +1,236 @@
+package com.example.appio_test_2.ui
+
+import androidx.lifecycle.AbstractSavedStateViewModelFactory
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.savedstate.SavedStateRegistryOwner
+import com.example.appio_test_2.data.repository.local.PlaceEntity
+import com.example.appio_test_2.domain.LocationRepository
+import com.example.appio_test_2.domain.PlaceLocalSource
+import com.example.appio_test_2.utils.SingleLiveData
+import com.yandex.mapkit.geometry.Point
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+
+class MapVm @AssistedInject constructor(
+    @Assisted private val state: SavedStateHandle,
+    @Assisted("stringResOne") private val stringResOne: String,
+    @Assisted("stringResTwo") private val stringResTwo: String,
+    private val locationRepository: LocationRepository,
+    private val placeLocalSource: PlaceLocalSource
+) : ViewModel() {
+
+
+    private val _uiState = MutableStateFlow(MapView.Model(listOf(MapPointUi())))
+    val uiState: StateFlow<MapView.Model> = _uiState.asStateFlow()
+
+    private val _uiLabels = SingleLiveData<MapView.UiLabel>()
+    val uiLabels: LiveData<MapView.UiLabel> get() = _uiLabels
+
+    var currentCoordinate: Point? = null
+
+
+    init {
+        viewModelScope.launch {
+            getCurrentCoordinate()
+            getAllPoints()
+        }
+    }
+
+    private suspend fun getCurrentCoordinate() {
+        locationRepository.getCurrentCoordinate().onSuccess { coordinate ->
+            currentCoordinate = Point(coordinate.latitude, coordinate.longitude)
+
+            val placeEntity = PlaceEntity(
+                id = 0,
+                latitude = coordinate.latitude,
+                longitude = coordinate.longitude,
+                name = stringResOne
+            )
+
+            placeLocalSource.insertPlace(placeEntity)
+
+            _uiState.update { state ->
+                state.copy(
+                    point = listOf(
+                        MapPointUi(
+                            latitude = coordinate.latitude,
+                            longitude = coordinate.longitude
+                        )
+                    )
+                )
+            }
+
+            _uiLabels.postValue(
+                MapView.UiLabel.CreatePlaceMark(
+                    currentCoordinate ?: Point(),
+                    stringResOne
+                )
+            )
+        }.onFailure {
+            _uiLabels.postValue(MapView.UiLabel.ShowSystemDialog)
+        }
+    }
+
+    fun onEvent(event: MapView.Event) {
+        when (event) {
+            is MapView.Event.OnLongClickMap -> handlerLongClick(event.point)
+            is MapView.Event.OnClickDeletePoint -> handlerDeletePoint(event.point)
+            is MapView.Event.OnClickDrivingRoute -> handleClickDriveRoute(event.endPoint)
+            is MapView.Event.AddNamePoint -> handlerAddName(event.point, event.pointName)
+            is MapView.Event.OnClickPoint -> handlerClickPoint(event.point)
+        }
+    }
+
+    private fun handlerAddName(point: Point, pointName: String) {
+        viewModelScope.launch {
+            val places = placeLocalSource.getAllPlace().first()
+
+            val existingPlace = places.firstOrNull {
+                abs(it.latitude - point.latitude) < 0.001 && abs(it.longitude - point.longitude) < 0.001
+            }
+
+            existingPlace?.let { place ->
+                val updatedPlaceEntity = place.copy(name = pointName)
+                placeLocalSource.updatePlace(updatedPlaceEntity)
+            } ?: run {
+                val newPlaceEntity = PlaceEntity(
+                    id = 0,
+                    latitude = point.latitude,
+                    longitude = point.longitude,
+                    name = pointName
+                )
+                placeLocalSource.insertPlace(newPlaceEntity)
+            }
+
+            _uiLabels.postValue(MapView.UiLabel.CreatePlaceMark(point, pointName))
+            getAllPoints()
+        }
+    }
+
+    private fun handleClickDriveRoute(endPoint: Point) {
+        _uiLabels.postValue(currentCoordinate?.let { MapView.UiLabel.DrivingRoute(it, endPoint) })
+    }
+
+    private fun handlerClickPoint(point: Point) {
+        viewModelScope.launch {
+            val places = placeLocalSource.getAllPlace().first()
+
+            val existingPlace = places.firstOrNull {
+                abs(it.latitude - point.latitude) < 0.1 && abs(it.longitude - point.longitude) < 0.1
+            }
+
+            existingPlace?.let { place ->
+                val pointName = place.name
+                _uiLabels.postValue(MapView.UiLabel.ShowDialogRouteOrDeletePoint(point, pointName))
+            } ?: run {
+                _uiLabels.postValue(
+                    MapView.UiLabel.ShowDialogRouteOrDeletePoint(
+                        point,
+                        stringResTwo
+                    )
+                )
+            }
+        }
+    }
+
+    private fun handlerDeletePoint(point: Point) {
+        viewModelScope.launch {
+            val delta = 0.001
+
+            val placeToDelete = _uiState.value.point.find {
+                abs(it.latitude - point.latitude) < delta && abs(it.longitude - point.longitude) < delta
+            }
+
+            placeToDelete?.let { place ->
+
+                placeLocalSource.deletePlace(place.id)
+
+                getAllPoints()
+            }
+        }
+    }
+
+    private fun handlerLongClick(point: Point) {
+        _uiLabels.postValue(MapView.UiLabel.ShowDialogCreateName(point))
+        viewModelScope.launch {
+            val placeEntity = PlaceEntity(
+                id = 0,
+                latitude = point.latitude,
+                longitude = point.longitude,
+                name = ""
+            )
+            placeLocalSource.insertPlace(placeEntity)
+            getAllPoints()
+        }
+    }
+
+    private fun getAllPoints() {
+        viewModelScope.launch {
+            placeLocalSource.getAllPlace().collect { places ->
+                _uiState.update { state ->
+                    state.copy(
+                        point = places.map { it.mapToDomain().mapToUi() }
+                    )
+                }
+            }
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            getData()
+        }
+    }
+
+    private suspend fun getData() {
+        locationRepository.getCurrentCoordinate().onSuccess { coordinate ->
+            _uiState.update {
+                it.copy(
+                    point = listOf(
+                        MapPointUi(
+                            latitude = coordinate.latitude,
+                            longitude = coordinate.longitude
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    @AssistedFactory
+    interface Factory {
+        fun build(
+            @Assisted state: SavedStateHandle,
+            @Assisted("stringResOne") stringResOne: String,
+            @Assisted("stringResTwo") stringResTwo: String,
+        ): MapVm
+    }
+}
+
+
+class LambdaFactory<T : ViewModel>(
+    savedStateRegistryOwner: SavedStateRegistryOwner,
+    private val create: (handle: SavedStateHandle) -> T,
+) : AbstractSavedStateViewModelFactory(savedStateRegistryOwner, null) {
+    override fun <T : ViewModel> create(
+        key: String,
+        modelClass: Class<T>,
+        handle: SavedStateHandle,
+    ): T {
+        return create(handle) as T
+    }
+}
+
+

@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">appio_test_2</string>
+    <string name="fragment_map_route">Построить маршрут</string>
+    <string name="fragment_map_question">Хотите построить маршрут до этой точки?</string>
+    <string name="fragment_map_yes">Да</string>
+    <string name="fragment_map_no">Нет</string>
+    <string name="fragment_map_delete_poits">Удалить метку</string>
+    <string name="fragment_map_on_geo">Включите геолокацию</string>
+    <string name="fragment_map_geo_text">Для работы приложения требуется включить геолокацию. Пожалуйста, включите ее в настройках.</string>
+    <string name="fragment_map_geo_settings">Настройки</string>
+    <string name="fragment_map_geo_cancel">Отмена</string>
+    <string name="fragment_map_create_name_hint">Введите название метки</string>
+    <string name="fragment_map_name_point">Назвать метку</string>
+    <string name="fragment_map_question_nme">Хотите назвать метку?</string>
+    <string name="fragment_map_names">Имя точки:%1$s координаты:%2$s %3$s</string>
+    <string name="fragment_map_current_point">Текущая позиция</string>
+    <string name="fragment_map_no_search">Место не найдено</string>
+</resources>
