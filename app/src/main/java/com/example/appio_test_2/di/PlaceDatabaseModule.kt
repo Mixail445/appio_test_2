@@ -11,7 +11,7 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object ReviewDatabaseModule {
+object PlaceDatabaseModule {
     @Singleton
     @Provides
     fun provideDatabase(@ApplicationContext context: Context) = PlaceDatabase.getDatabase(context)

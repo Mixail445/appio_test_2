@@ -1,5 +1,9 @@
 package com.example.appio_test_2.ui
 
+import com.example.appio_test_2.utils.Constants.EMPTY_STRING
+import com.example.appio_test_2.utils.Constants.ZERO_DOUBLE
+import com.example.appio_test_2.utils.Constants.ZERO_LONG
+
 interface MapView {
     data class Model(
         val point: List<MapPointUi> = emptyList()
@@ -28,14 +32,14 @@ interface MapView {
         ) : UiLabel()
 
         data class CreatePlaceMark(
-            val point: com.yandex.mapkit.geometry.Point, val pointName: String = ""
+            val point: com.yandex.mapkit.geometry.Point, val pointName: String = EMPTY_STRING
         ) : UiLabel()
     }
 }
 
 data class MapPointUi(
-    val id: Long = 0,
-    val latitude: Double = 0.0,
-    val longitude: Double = 0.0,
-    val name: String = "",
+    val id: Long = ZERO_LONG.toLong(),
+    val latitude: Double = ZERO_DOUBLE,
+    val longitude: Double = ZERO_DOUBLE,
+    val name: String = EMPTY_STRING,
 )

@@ -21,12 +21,10 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
 
-
     @Provides
     @Singleton
     fun provideLocalSource(
-        dao: PlaceDao,
-        dispatchersProvider: DispatchersProvider
+        dao: PlaceDao, dispatchersProvider: DispatchersProvider
     ): PlaceLocalSource = PlaceLocalSourceImpl(dao, dispatchersProvider)
 
     @Singleton
@@ -53,3 +51,4 @@ object RepositoryModule {
         return CurrentLocationRepositoryImpl(fusedLocationClient)
     }
 }
+

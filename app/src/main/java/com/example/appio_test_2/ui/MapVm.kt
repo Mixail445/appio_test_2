@@ -11,6 +11,14 @@ import com.example.appio_test_2.data.repository.LocationResult
 import com.example.appio_test_2.data.repository.local.PlaceEntity
 import com.example.appio_test_2.domain.LocationRepository
 import com.example.appio_test_2.domain.PlaceLocalSource
+import com.example.appio_test_2.utils.Constants.DELTA
+import com.example.appio_test_2.utils.Constants.DELTA_TWO
+import com.example.appio_test_2.utils.Constants.EMPTY_STRING
+import com.example.appio_test_2.utils.Constants.ERROR_MESSAGE
+import com.example.appio_test_2.utils.Constants.NOT_FOUND_MESSAGE
+import com.example.appio_test_2.utils.Constants.TAG_ERROR
+import com.example.appio_test_2.utils.Constants.TAG_NOT_FOUND
+import com.example.appio_test_2.utils.Constants.ZERO_INT
 import com.example.appio_test_2.utils.SingleLiveData
 import com.yandex.mapkit.geometry.Point
 import dagger.assisted.Assisted
@@ -29,7 +37,7 @@ class MapVm @AssistedInject constructor(
     @Assisted("stringResOne") private val stringResOne: String,
     @Assisted("stringResTwo") private val stringResTwo: String,
     private val locationRepository: LocationRepository,
-    private val placeLocalSource: PlaceLocalSource
+    private val placeLocalSource: PlaceLocalSource,
 ) : ViewModel() {
 
 
@@ -58,7 +66,7 @@ class MapVm @AssistedInject constructor(
             }
 
             is LocationResult.NotFound -> {
-                Log.d("mapVmErrorNotFound", "location not found")
+                Log.d(TAG_NOT_FOUND, NOT_FOUND_MESSAGE)
             }
 
             is LocationResult.PermissionDenied -> {
@@ -66,15 +74,16 @@ class MapVm @AssistedInject constructor(
             }
 
             is LocationResult.Error -> {
-                Log.d("mapVmError", "location error")
+                Log.d(TAG_ERROR, ERROR_MESSAGE)
             }
         }
     }
 
+
     private suspend fun saveCurrentLocation() {
         currentCoordinate?.let { coordinate ->
             val placeEntity = PlaceEntity(
-                id = 0,
+                id = ZERO_INT.toLong(),
                 latitude = coordinate.latitude,
                 longitude = coordinate.longitude,
                 name = stringResOne
@@ -116,7 +125,7 @@ class MapVm @AssistedInject constructor(
             val places = placeLocalSource.getAllPlace().first()
 
             val existingPlace = places.firstOrNull {
-                abs(it.latitude - point.latitude) < 0.001 && abs(it.longitude - point.longitude) < 0.001
+                abs(it.latitude - point.latitude) < DELTA && abs(it.longitude - point.longitude) < DELTA
             }
 
             existingPlace?.let { place ->
@@ -124,7 +133,7 @@ class MapVm @AssistedInject constructor(
                 placeLocalSource.updatePlace(updatedPlaceEntity)
             } ?: run {
                 val newPlaceEntity = PlaceEntity(
-                    id = 0,
+                    id = ZERO_INT.toLong(),
                     latitude = point.latitude,
                     longitude = point.longitude,
                     name = pointName
@@ -146,7 +155,7 @@ class MapVm @AssistedInject constructor(
             val places = placeLocalSource.getAllPlace().first()
 
             val existingPlace = places.firstOrNull {
-                abs(it.latitude - point.latitude) < 0.1 && abs(it.longitude - point.longitude) < 0.1
+                abs(it.latitude - point.latitude) < DELTA_TWO && abs(it.longitude - point.longitude) < DELTA_TWO
             }
 
             existingPlace?.let { place ->
@@ -165,7 +174,7 @@ class MapVm @AssistedInject constructor(
 
     private fun handlerDeletePoint(point: Point) {
         viewModelScope.launch {
-            val delta = 0.001
+            val delta = DELTA
 
             val placeToDelete = _uiState.value.point.find {
                 abs(it.latitude - point.latitude) < delta && abs(it.longitude - point.longitude) < delta
@@ -184,10 +193,10 @@ class MapVm @AssistedInject constructor(
         _uiLabels.postValue(MapView.UiLabel.ShowDialogCreateName(point))
         viewModelScope.launch {
             val placeEntity = PlaceEntity(
-                id = 0,
+                id = ZERO_INT.toLong(),
                 latitude = point.latitude,
                 longitude = point.longitude,
-                name = ""
+                name = EMPTY_STRING
             )
             placeLocalSource.insertPlace(placeEntity)
             fetchAllPoints()
@@ -205,7 +214,6 @@ class MapVm @AssistedInject constructor(
             }
         }
     }
-
 
     @AssistedFactory
     interface Factory {

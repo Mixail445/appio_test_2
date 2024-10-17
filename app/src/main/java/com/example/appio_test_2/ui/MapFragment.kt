@@ -1,23 +1,28 @@
 package com.example.appio_test_2.ui
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.PointF
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.example.appio_test_2.R
 import com.example.appio_test_2.databinding.MapFragmentBinding
-import com.example.appio_test_2.utils.showDialog
+import com.example.appio_test_2.utils.Constants.ANCHOR_POINT
+import com.example.appio_test_2.utils.Constants.DEFAULT_ZOOM_LEVEL
+import com.example.appio_test_2.utils.Constants.EMPTY_STRING
+import com.example.appio_test_2.utils.Constants.ICON_SCALE
+import com.example.appio_test_2.utils.Constants.ONE_INT
+import com.example.appio_test_2.utils.Constants.POLYLINE_STROKE_WIDTH
+import com.example.appio_test_2.utils.Constants.ZERO_FLOAT
+import com.example.appio_test_2.utils.CustomDialogCreator
+import com.example.appio_test_2.utils.PermissionManager
 import com.example.appio_test_2.utils.subscribe
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.RequestPoint
@@ -47,7 +52,14 @@ class MapFragment : Fragment() {
     private lateinit var placeMarkMapObject: PlacemarkMapObject
 
     @Inject
+    lateinit var permissionManager: PermissionManager
+
+    @Inject
     lateinit var factory: MapVm.Factory
+
+    @Inject
+    lateinit var customDialogCreator: Lazy<CustomDialogCreator>
+
     private val viewModel: MapVm by viewModels {
         LambdaFactory(this) {
             factory.build(
@@ -95,59 +107,28 @@ class MapFragment : Fragment() {
     }
 
     private fun showDialogHandlerToSettings() {
-        showDialog(
-            title = getString(R.string.fragment_map_on_geo),
-            message = getString(R.string.fragment_map_geo_text),
-            positiveButtonText = getString(R.string.fragment_map_geo_settings),
-            negativeButtonText = getString(R.string.fragment_map_geo_cancel),
-            onPositiveClick = {
-                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                startActivity(intent)
-            }
-        )
+        customDialogCreator.value.showSettingsDialog {
+            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            startActivity(intent)
+        }
     }
 
     @SuppressLint("StringFormatMatches")
     private fun showDialogRoute(point: Point, namePoint: String) {
-        showDialog(
-            title = getString(
-                R.string.fragment_map_names,
-                namePoint,
-                point.latitude,
-                point.longitude
-            ),
-            message = getString(R.string.fragment_map_question),
-            positiveButtonText = getString(R.string.fragment_map_yes),
-            negativeButtonText = getString(R.string.fragment_map_no),
-            neutralButton = getString(R.string.map_fragment_delete_point),
-            onNeutralClick = {
-                viewModel.onEvent(MapView.Event.OnClickDeletePoint(point))
-            },
+        customDialogCreator.value.showRouteDialog(point, namePoint,
             onPositiveClick = {
                 viewModel.onEvent(MapView.Event.OnClickDrivingRoute(point))
+            },
+            onNeutralClick = {
+                viewModel.onEvent(MapView.Event.OnClickDeletePoint(point))
             }
         )
     }
 
     private fun showDialogCreateName(point: Point) {
-        val editText = EditText(requireContext()).apply {
-            hint = context.getString(R.string.fragment_map_create_name_hint)
-        }
-
-        val dialogBuilder = AlertDialog.Builder(requireContext())
-        dialogBuilder.setTitle(getString(R.string.fragment_map_name_point))
-        dialogBuilder.setMessage(getString(R.string.fragment_map_question_nme))
-        dialogBuilder.setView(editText)
-        dialogBuilder.setNegativeButton(R.string.fragment_map_no) { dialog, _ ->
-            dialog.dismiss()
-        }
-
-        dialogBuilder.setPositiveButton(R.string.fragment_map_yes) { _, _ ->
-            val pointName = editText.text.toString()
+        customDialogCreator.value.showCreateNameDialog { pointName ->
             viewModel.onEvent(MapView.Event.AddNamePoint(point, pointName))
         }
-
-        dialogBuilder.create().show()
     }
 
     override fun onCreateView(
@@ -156,9 +137,23 @@ class MapFragment : Fragment() {
         savedInstanceState: Bundle?,
     ): View {
         _binding = MapFragmentBinding.inflate(inflater, container, false)
+
         initViewModel()
         map = binding.mapview.mapWindow.map
+        checkLocationPermissions()
+        moveToCurrentLocation()
+        map.addInputListener(inputListener)
 
+        return binding.root
+    }
+
+    private fun checkLocationPermissions() {
+        if (!permissionManager.hasLocationPermissions()) {
+            permissionManager.requestLocationPermissions()
+        }
+    }
+
+    private fun moveToCurrentLocation() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.uiState.collect { state ->
                 map.mapObjects.clear()
@@ -171,7 +166,10 @@ class MapFragment : Fragment() {
 
                 if (!isCameraMoved && viewModel.currentCoordinate != null) {
                     val cameraPosition = CameraPosition(
-                        viewModel.currentCoordinate ?: Point(), DEFAULT_ZOOM_LEVEL, 0f, 0f
+                        viewModel.currentCoordinate ?: Point(),
+                        DEFAULT_ZOOM_LEVEL,
+                        ZERO_FLOAT,
+                        ZERO_FLOAT
                     )
 
                     map.move(cameraPosition)
@@ -179,23 +177,28 @@ class MapFragment : Fragment() {
                 }
             }
         }
-
-        map.addInputListener(inputListener)
-
-        return binding.root
     }
 
 
-    private fun createPlaceMark(point: Point, pointName: String = "") {
-        placeMarkMapObject = map.mapObjects.addPlacemark().apply {
+    private fun createPlaceMark(point: Point, pointName: String = EMPTY_STRING) {
+        placeMarkMapObject = map.mapObjects.addPlacemark(point).apply {
+
             setText(pointName)
-            setIcon(ImageProvider.fromResource(requireActivity(), R.drawable.map),
+
+            setIcon(
+                ImageProvider.fromResource(
+                    requireActivity(),
+                    com.yandex.maps.mobile.R.drawable.search_layer_pin_icon_default
+                ),
                 IconStyle().apply {
-                    anchor = PointF(0.5f, 1f)
-                    scale = 0.09f
-                })
-            geometry = point
+                    anchor = ANCHOR_POINT
+                    scale = ICON_SCALE
+                }
+            )
+
             isDraggable = true
+
+
             addTapListener { _, _ ->
                 handleTap(point)
                 true
@@ -213,7 +216,7 @@ class MapFragment : Fragment() {
             DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.COMBINED)
 
         val drivingOptions = DrivingOptions().apply {
-            routesCount = 1
+            routesCount = ONE_INT
         }
 
         val vehicleOptions = VehicleOptions()
@@ -238,7 +241,10 @@ class MapFragment : Fragment() {
                 }
 
                 override fun onDrivingRoutesError(p0: com.yandex.runtime.Error) {
-                    Log.e("MapFragment", "Error fetching routes: $p0")
+                    Log.e(
+                        getString(R.string.map_fragment_name),
+                        getString(R.string.map_fragment_error_fetch, p0)
+                    )
                 }
             })
     }
@@ -258,8 +264,4 @@ class MapFragment : Fragment() {
         _binding = null
     }
 
-    private companion object {
-        const val DEFAULT_ZOOM_LEVEL = 15f
-        const val POLYLINE_STROKE_WIDTH = 10f
-    }
 }

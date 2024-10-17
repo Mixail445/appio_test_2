@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.appio_test_2.utils.Constants.DATABASE_NAME
 
 @Database(
     [PlaceEntity::class],
@@ -26,7 +27,7 @@ abstract class PlaceDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     PlaceDatabase::class.java,
-                    "place_database"
+                    DATABASE_NAME
                 ).build()
                 INSTANCE = instance
                 return instance
