@@ -1,7 +1,7 @@
 package com.example.appio_test_2.domain
 
-import android.location.Location
+import com.example.appio_test_2.data.repository.LocationResult
 
 interface LocationRepository {
-    suspend fun getCurrentCoordinate(): Result<Location>
+    suspend fun getCurrentCoordinate(): LocationResult
 }

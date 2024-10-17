@@ -9,6 +9,8 @@ fun Fragment.showDialog(
     message: String,
     positiveButtonText: String,
     negativeButtonText: String? = null,
+    neutralButton: String? = null,
+    onNeutralClick: (() -> Unit)? = null,
     onPositiveClick: (() -> Unit)? = null,
     onNegativeClick: (() -> Unit)? = null
 ) {
@@ -19,7 +21,9 @@ fun Fragment.showDialog(
     builder.setPositiveButton(positiveButtonText) { _, _ ->
         onPositiveClick?.invoke()
     }
-
+    builder.setNeutralButton(neutralButton) { _, _ ->
+        onNeutralClick?.invoke()
+    }
     negativeButtonText?.let {
         builder.setNegativeButton(it) { dialog, _ ->
             onNegativeClick?.invoke()

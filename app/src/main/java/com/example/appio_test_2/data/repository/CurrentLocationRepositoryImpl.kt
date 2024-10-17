@@ -11,19 +11,26 @@ class CurrentLocationRepositoryImpl @Inject constructor(private val fusedLocatio
     LocationRepository {
 
     @SuppressLint("MissingPermission")
-    override suspend fun getCurrentCoordinate(): Result<Location> {
-        val locationResult = CompletableDeferred<Result<Location>>()
+    override suspend fun getCurrentCoordinate(): LocationResult {
+        val locationResult = CompletableDeferred<LocationResult>()
 
         fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
             if (location != null) {
-                locationResult.complete(Result.success(location))
+                locationResult.complete(LocationResult.Success(location))
             } else {
-                locationResult.complete(Result.failure(Exception("Location not found")))
+                locationResult.complete(LocationResult.NotFound)
             }
         }.addOnFailureListener { exception ->
-            locationResult.complete(Result.failure(exception))
+            locationResult.complete(LocationResult.Error(exception))
         }
 
         return locationResult.await()
     }
+}
+
+sealed class LocationResult {
+    data class Success(val location: Location) : LocationResult()
+    data object NotFound : LocationResult()
+    data object PermissionDenied : LocationResult()
+    data class Error(val exception: Exception) : LocationResult()
 }

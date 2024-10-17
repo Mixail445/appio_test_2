@@ -15,4 +15,5 @@
     <string name="fragment_map_names">Имя точки:%1$s координаты:%2$s %3$s</string>
     <string name="fragment_map_current_point">Текущая позиция</string>
     <string name="fragment_map_no_search">Место не найдено</string>
+    <string name="map_fragment_delete_point">Удалить точку</string>
 </resources>

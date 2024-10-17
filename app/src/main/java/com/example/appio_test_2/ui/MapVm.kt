@@ -1,11 +1,13 @@
 package com.example.appio_test_2.ui
 
+import android.util.Log
 import androidx.lifecycle.AbstractSavedStateViewModelFactory
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.savedstate.SavedStateRegistryOwner
+import com.example.appio_test_2.data.repository.LocationResult
 import com.example.appio_test_2.data.repository.local.PlaceEntity
 import com.example.appio_test_2.domain.LocationRepository
 import com.example.appio_test_2.domain.PlaceLocalSource
@@ -24,7 +26,6 @@ import kotlin.math.abs
 
 
 class MapVm @AssistedInject constructor(
-    @Assisted private val state: SavedStateHandle,
     @Assisted("stringResOne") private val stringResOne: String,
     @Assisted("stringResTwo") private val stringResTwo: String,
     private val locationRepository: LocationRepository,
@@ -43,45 +44,62 @@ class MapVm @AssistedInject constructor(
 
     init {
         viewModelScope.launch {
-            getCurrentCoordinate()
-            getAllPoints()
+            fetchCurrentCoordinate()
+            fetchAllPoints()
         }
     }
 
-    private suspend fun getCurrentCoordinate() {
-        locationRepository.getCurrentCoordinate().onSuccess { coordinate ->
-            currentCoordinate = Point(coordinate.latitude, coordinate.longitude)
+    private suspend fun fetchCurrentCoordinate() {
+        when (val result = locationRepository.getCurrentCoordinate()) {
+            is LocationResult.Success -> {
+                currentCoordinate = Point(result.location.latitude, result.location.longitude)
+                saveCurrentLocation()
+                emitCreatePlaceMark()
+            }
 
+            is LocationResult.NotFound -> {
+                Log.d("mapVmErrorNotFound", "location not found")
+            }
+
+            is LocationResult.PermissionDenied -> {
+                _uiLabels.postValue(MapView.UiLabel.ShowSystemDialog)
+            }
+
+            is LocationResult.Error -> {
+                Log.d("mapVmError", "location error")
+            }
+        }
+    }
+
+    private suspend fun saveCurrentLocation() {
+        currentCoordinate?.let { coordinate ->
             val placeEntity = PlaceEntity(
                 id = 0,
                 latitude = coordinate.latitude,
                 longitude = coordinate.longitude,
                 name = stringResOne
             )
-
             placeLocalSource.insertPlace(placeEntity)
 
             _uiState.update { state ->
                 state.copy(
                     point = listOf(
                         MapPointUi(
-                            latitude = coordinate.latitude,
-                            longitude = coordinate.longitude
+                            coordinate.latitude.toLong(),
+                            coordinate.longitude
                         )
                     )
                 )
             }
-
-            _uiLabels.postValue(
-                MapView.UiLabel.CreatePlaceMark(
-                    currentCoordinate ?: Point(),
-                    stringResOne
-                )
-            )
-        }.onFailure {
-            _uiLabels.postValue(MapView.UiLabel.ShowSystemDialog)
         }
     }
+
+    private fun emitCreatePlaceMark() {
+        currentCoordinate?.let { coordinate ->
+            _uiLabels.postValue(MapView.UiLabel.CreatePlaceMark(coordinate, stringResOne))
+        }
+    }
+
 
     fun onEvent(event: MapView.Event) {
         when (event) {
@@ -115,7 +133,7 @@ class MapVm @AssistedInject constructor(
             }
 
             _uiLabels.postValue(MapView.UiLabel.CreatePlaceMark(point, pointName))
-            getAllPoints()
+            fetchAllPoints()
         }
     }
 
@@ -157,7 +175,7 @@ class MapVm @AssistedInject constructor(
 
                 placeLocalSource.deletePlace(place.id)
 
-                getAllPoints()
+                fetchAllPoints()
             }
         }
     }
@@ -172,11 +190,11 @@ class MapVm @AssistedInject constructor(
                 name = ""
             )
             placeLocalSource.insertPlace(placeEntity)
-            getAllPoints()
+            fetchAllPoints()
         }
     }
 
-    private fun getAllPoints() {
+    private fun fetchAllPoints() {
         viewModelScope.launch {
             placeLocalSource.getAllPlace().collect { places ->
                 _uiState.update { state ->
@@ -188,31 +206,10 @@ class MapVm @AssistedInject constructor(
         }
     }
 
-    init {
-        viewModelScope.launch {
-            getData()
-        }
-    }
-
-    private suspend fun getData() {
-        locationRepository.getCurrentCoordinate().onSuccess { coordinate ->
-            _uiState.update {
-                it.copy(
-                    point = listOf(
-                        MapPointUi(
-                            latitude = coordinate.latitude,
-                            longitude = coordinate.longitude
-                        )
-                    )
-                )
-            }
-        }
-    }
 
     @AssistedFactory
     interface Factory {
         fun build(
-            @Assisted state: SavedStateHandle,
             @Assisted("stringResOne") stringResOne: String,
             @Assisted("stringResTwo") stringResTwo: String,
         ): MapVm
@@ -220,6 +217,7 @@ class MapVm @AssistedInject constructor(
 }
 
 
+@Suppress("UNCHECKED_CAST")
 class LambdaFactory<T : ViewModel>(
     savedStateRegistryOwner: SavedStateRegistryOwner,
     private val create: (handle: SavedStateHandle) -> T,

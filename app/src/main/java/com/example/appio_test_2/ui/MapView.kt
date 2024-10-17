@@ -11,8 +11,7 @@ interface MapView {
         data class OnClickDeletePoint(val point: com.yandex.mapkit.geometry.Point) : Event()
         data class OnClickDrivingRoute(val endPoint: com.yandex.mapkit.geometry.Point) : Event()
         data class AddNamePoint(
-            val point: com.yandex.mapkit.geometry.Point,
-            val pointName: String
+            val point: com.yandex.mapkit.geometry.Point, val pointName: String
         ) : Event()
     }
 
@@ -20,10 +19,8 @@ interface MapView {
         data object ShowSystemDialog : UiLabel()
         data class ShowDialogCreateName(val point: com.yandex.mapkit.geometry.Point) : UiLabel()
         data class ShowDialogRouteOrDeletePoint(
-            val point: com.yandex.mapkit.geometry.Point,
-            val namePoint: String
-        ) :
-            UiLabel()
+            val point: com.yandex.mapkit.geometry.Point, val namePoint: String
+        ) : UiLabel()
 
         data class DrivingRoute(
             val startPoint: com.yandex.mapkit.geometry.Point,
@@ -31,8 +28,7 @@ interface MapView {
         ) : UiLabel()
 
         data class CreatePlaceMark(
-            val point: com.yandex.mapkit.geometry.Point,
-            val pointName: String = ""
+            val point: com.yandex.mapkit.geometry.Point, val pointName: String = ""
         ) : UiLabel()
     }
 }

@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.PointF
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -51,7 +52,6 @@ class MapFragment : Fragment() {
     private val viewModel: MapVm by viewModels {
         LambdaFactory(this) {
             factory.build(
-                it,
                 stringResOne = getString(R.string.fragment_map_current_point),
                 stringResTwo = getString(
                     R.string.fragment_map_no_search
@@ -61,7 +61,7 @@ class MapFragment : Fragment() {
     }
 
     private val placeMarkTapListener = MapObjectTapListener { _, point ->
-        viewModel.onEvent(MapView.Event.OnClickPoint(point))
+        handleTap(point)
         true
     }
     private var isCameraMoved = false
@@ -70,7 +70,7 @@ class MapFragment : Fragment() {
         override fun onMapTap(map: Map, point: Point) = Unit
 
         override fun onMapLongTap(map: Map, point: Point) {
-            viewModel.onEvent(MapView.Event.OnLongClickMap(point))
+            handleLongClick(point)
         }
     }
 
@@ -78,6 +78,14 @@ class MapFragment : Fragment() {
         with(viewModel) {
             subscribe(uiLabels, ::handleUiLabel)
         }
+    }
+
+    private fun handleLongClick(point: Point) {
+        viewModel.onEvent(MapView.Event.OnLongClickMap(point))
+    }
+
+    private fun handleTap(point: Point) {
+        viewModel.onEvent(MapView.Event.OnClickPoint(point))
     }
 
     private fun handleUiLabel(uiLabel: MapView.UiLabel): Unit = when (uiLabel) {
@@ -116,6 +124,10 @@ class MapFragment : Fragment() {
             message = getString(R.string.fragment_map_question),
             positiveButtonText = getString(R.string.fragment_map_yes),
             negativeButtonText = getString(R.string.fragment_map_no),
+            neutralButton = getString(R.string.map_fragment_delete_point),
+            onNeutralClick = {
+                viewModel.onEvent(MapView.Event.OnClickDeletePoint(point))
+            },
             onPositiveClick = {
                 viewModel.onEvent(MapView.Event.OnClickDrivingRoute(point))
             }
@@ -131,7 +143,6 @@ class MapFragment : Fragment() {
         dialogBuilder.setTitle(getString(R.string.fragment_map_name_point))
         dialogBuilder.setMessage(getString(R.string.fragment_map_question_nme))
         dialogBuilder.setView(editText)
-
         dialogBuilder.setNegativeButton(R.string.fragment_map_no) { dialog, _ ->
             dialog.dismiss()
         }
@@ -165,7 +176,7 @@ class MapFragment : Fragment() {
 
                 if (!isCameraMoved && viewModel.currentCoordinate != null) {
                     val cameraPosition = CameraPosition(
-                        viewModel.currentCoordinate ?: Point(), 15f, 0f, 0f
+                        viewModel.currentCoordinate ?: Point(), DEFAULT_ZOOM_LEVEL, 0f, 0f
                     )
 
                     map.move(cameraPosition)
@@ -213,7 +224,6 @@ class MapFragment : Fragment() {
             add(RequestPoint(startPoint, RequestPointType.WAYPOINT, null, ""))
             add(RequestPoint(endPoint, RequestPointType.WAYPOINT, null, ""))
         }
-        //map.mapObjects.clear()
         drivingRouter.requestRoutes(points,
             drivingOptions,
             vehicleOptions,
@@ -223,12 +233,14 @@ class MapFragment : Fragment() {
                         drivingRoutes.map {
                             val polyline = map.mapObjects.addPolyline(it.geometry)
                             polyline.setStrokeColor(Color.GRAY)
-                            polyline.strokeWidth = 10f
+                            polyline.strokeWidth = POLYLINE_STROKE_WIDTH
                         }
                     }
                 }
 
-                override fun onDrivingRoutesError(p0: com.yandex.runtime.Error) = Unit
+                override fun onDrivingRoutesError(p0: com.yandex.runtime.Error) {
+                    Log.e("MapFragment", "Error fetching routes: $p0")
+                }
             })
     }
 
@@ -245,5 +257,10 @@ class MapFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         _binding = null
+    }
+
+    private companion object {
+        const val DEFAULT_ZOOM_LEVEL = 15f
+        const val POLYLINE_STROKE_WIDTH = 10f
     }
 }
