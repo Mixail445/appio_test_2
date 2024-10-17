@@ -33,7 +33,6 @@ import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.map.IconStyle
 import com.yandex.mapkit.map.InputListener
 import com.yandex.mapkit.map.Map
-import com.yandex.mapkit.map.MapObjectTapListener
 import com.yandex.mapkit.map.PlacemarkMapObject
 import com.yandex.runtime.image.ImageProvider
 import dagger.hilt.android.AndroidEntryPoint
@@ -60,10 +59,6 @@ class MapFragment : Fragment() {
         }
     }
 
-    private val placeMarkTapListener = MapObjectTapListener { _, point ->
-        handleTap(point)
-        true
-    }
     private var isCameraMoved = false
 
     private val inputListener = object : InputListener {
@@ -201,7 +196,10 @@ class MapFragment : Fragment() {
                 })
             geometry = point
             isDraggable = true
-            addTapListener(placeMarkTapListener)
+            addTapListener { _, _ ->
+                handleTap(point)
+                true
+            }
         }
     }
 
@@ -224,6 +222,7 @@ class MapFragment : Fragment() {
             add(RequestPoint(startPoint, RequestPointType.WAYPOINT, null, ""))
             add(RequestPoint(endPoint, RequestPointType.WAYPOINT, null, ""))
         }
+
         drivingRouter.requestRoutes(points,
             drivingOptions,
             vehicleOptions,
