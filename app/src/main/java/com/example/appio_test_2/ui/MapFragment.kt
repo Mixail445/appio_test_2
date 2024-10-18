@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +23,7 @@ import com.example.appio_test_2.utils.Constants.ONE_INT
 import com.example.appio_test_2.utils.Constants.POLYLINE_STROKE_WIDTH
 import com.example.appio_test_2.utils.Constants.ZERO_FLOAT
 import com.example.appio_test_2.utils.CustomDialogCreator
+import com.example.appio_test_2.utils.PermissionGrande
 import com.example.appio_test_2.utils.PermissionManager
 import com.example.appio_test_2.utils.subscribe
 import com.yandex.mapkit.MapKitFactory
@@ -45,7 +47,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MapFragment : Fragment() {
+class MapFragment : Fragment(), PermissionGrande {
     private var _binding: MapFragmentBinding? = null
     private val binding get() = _binding!!
     private lateinit var map: Map
@@ -141,15 +143,17 @@ class MapFragment : Fragment() {
         initViewModel()
         map = binding.mapview.mapWindow.map
         checkLocationPermissions()
-        moveToCurrentLocation()
         map.addInputListener(inputListener)
 
         return binding.root
     }
 
     private fun checkLocationPermissions() {
+        moveToCurrentLocation()
         if (!permissionManager.hasLocationPermissions()) {
             permissionManager.requestLocationPermissions()
+        } else {
+            Unit
         }
     }
 
@@ -158,12 +162,12 @@ class MapFragment : Fragment() {
             viewModel.uiState.collect { state ->
                 map.mapObjects.clear()
 
-                state.point.forEach { domainPoint ->
+                state.point.forEach { uiPoint ->
                     createPlaceMark(
-                        Point(domainPoint.latitude, domainPoint.longitude), domainPoint.name
+                        Point(uiPoint.latitude, uiPoint.longitude), uiPoint.name
                     )
                 }
-
+                viewModel
                 if (!isCameraMoved && viewModel.currentCoordinate != null) {
                     val cameraPosition = CameraPosition(
                         viewModel.currentCoordinate ?: Point(),
@@ -181,8 +185,8 @@ class MapFragment : Fragment() {
 
 
     private fun createPlaceMark(point: Point, pointName: String = EMPTY_STRING) {
-        placeMarkMapObject = map.mapObjects.addPlacemark(point).apply {
-
+        placeMarkMapObject = map.mapObjects.addPlacemark().apply {
+            geometry = point
             setText(pointName)
 
             setIcon(
@@ -222,8 +226,8 @@ class MapFragment : Fragment() {
         val vehicleOptions = VehicleOptions()
 
         val points = buildList {
-            add(RequestPoint(startPoint, RequestPointType.WAYPOINT, null, ""))
-            add(RequestPoint(endPoint, RequestPointType.WAYPOINT, null, ""))
+            add(RequestPoint(startPoint, RequestPointType.WAYPOINT, null, EMPTY_STRING))
+            add(RequestPoint(endPoint, RequestPointType.WAYPOINT, null, EMPTY_STRING))
         }
 
         drivingRouter.requestRoutes(points,
@@ -262,6 +266,17 @@ class MapFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         _binding = null
+    }
+
+    override fun onPermissionsGranted() {
+        viewModel.onEvent(MapView.Event.RequestCoordinate)
+    }
+
+    override fun onPermissionsDenied() {
+        Toast.makeText(
+            requireContext(),
+            getString(R.string.map_fragment_permission), Toast.LENGTH_SHORT
+        ).show()
     }
 
 }

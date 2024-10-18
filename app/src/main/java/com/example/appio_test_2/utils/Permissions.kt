@@ -10,8 +10,8 @@ import javax.inject.Inject
 
 class LocationPermissionManager @Inject constructor(
     private val fragment: Fragment,
+    private val callback: PermissionGrande
 ) : PermissionManager {
-
     private var locationPermissionRequest: ActivityResultLauncher<Array<String>> =
         fragment.requireActivity().registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -19,9 +19,11 @@ class LocationPermissionManager @Inject constructor(
             when {
                 permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                         permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true -> {
+                    callback.onPermissionsGranted()
                 }
+
                 else -> {
-                    Unit
+                    callback.onPermissionsDenied()
                 }
             }
         }
@@ -49,4 +51,9 @@ class LocationPermissionManager @Inject constructor(
 interface PermissionManager {
     fun requestLocationPermissions()
     fun hasLocationPermissions(): Boolean
+}
+
+interface PermissionGrande {
+    fun onPermissionsGranted()
+    fun onPermissionsDenied()
 }

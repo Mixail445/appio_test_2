@@ -10,6 +10,7 @@ interface MapView {
     )
 
     sealed class Event {
+        data object RequestCoordinate : Event()
         data class OnLongClickMap(val point: com.yandex.mapkit.geometry.Point) : Event()
         data class OnClickPoint(val point: com.yandex.mapkit.geometry.Point) : Event()
         data class OnClickDeletePoint(val point: com.yandex.mapkit.geometry.Point) : Event()
@@ -38,7 +39,7 @@ interface MapView {
 }
 
 data class MapPointUi(
-    val id: Long = ZERO_LONG.toLong(),
+    val id: Long = ZERO_LONG,
     val latitude: Double = ZERO_DOUBLE,
     val longitude: Double = ZERO_DOUBLE,
     val name: String = EMPTY_STRING,

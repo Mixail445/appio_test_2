@@ -79,7 +79,6 @@ class MapVm @AssistedInject constructor(
         }
     }
 
-
     private suspend fun saveCurrentLocation() {
         currentCoordinate?.let { coordinate ->
             val placeEntity = PlaceEntity(
@@ -117,6 +116,13 @@ class MapVm @AssistedInject constructor(
             is MapView.Event.OnClickDrivingRoute -> handleClickDriveRoute(event.endPoint)
             is MapView.Event.AddNamePoint -> handlerAddName(event.point, event.pointName)
             is MapView.Event.OnClickPoint -> handlerClickPoint(event.point)
+            MapView.Event.RequestCoordinate -> handlerCurrentCoordinate()
+        }
+    }
+
+    private fun handlerCurrentCoordinate() {
+        viewModelScope.launch {
+            fetchCurrentCoordinate()
         }
     }
 
